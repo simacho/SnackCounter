@@ -12,7 +12,6 @@ const qs = require('qs');
 
 const signature = require('./verifySignature');
 const appHome = require('./appHome');
-const message = require('./message');
 
 const app = express();
 
@@ -67,29 +66,6 @@ app.post('/slack/events', async(req, res) => {
           // Display App Home
           appHome.displayHome(user);
         }
-        
-        /* 
-         * If you want to allow user to create a note from DM, uncomment the part! 
-
-        // Triggered when the bot gets a DM
-        else if(type === 'message') {
-          
-          if(subtype !== 'bot_message') { 
-            
-            // Create a note from the text with a default color
-            const timestamp = new Date();
-            const data = {
-              timestamp: timestamp,
-              note: text,
-              color: 'yellow'
-            }
-            await appHome.displayHome(user, data);
-                                         
-            // DM back to the user 
-            message.send(channel, text);
-          }
-        }
-        */
       }
       break;
     }
@@ -120,9 +96,7 @@ app.post('/slack/actions', async(req, res) => {
     
     const ts = new Date();
     const { user, view } = JSON.parse(req.body.payload);
-    
-   // console.log("---------------",view.state.values.flyer.snack.selected_option )   
-    
+        
     const data = {
       timestamp: ts.toLocaleString(),
       value: view.state.values.flyer.snack.selected_option.value
