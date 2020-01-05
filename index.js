@@ -5,6 +5,7 @@
  */
 
 const express = require('express');
+const request = require('request');
 const bodyParser = require('body-parser');
 const axios = require('axios'); 
 const qs = require('qs');
@@ -34,6 +35,7 @@ const rawBodyBuffer = (req, res, buf, encoding) => {
 app.use(bodyParser.urlencoded({verify: rawBodyBuffer, extended: true }));
 app.use(bodyParser.json({ verify: rawBodyBuffer }));
 
+app.use(express.static(__dirname + '/public'));
 
 /*
  * Endpoint to receive events from Events API.
@@ -109,7 +111,7 @@ app.post('/slack/actions', async(req, res) => {
   // Button with "add_" action_id clicked --
   if(actions && actions[0].action_id.match(/add_/)) {
     // Open a modal window with forms to be submitted by a user
-    appHome.openModal(trigger_id);
+    appHome.openModal(trigger_id,user.id);
   } 
   
   // Modal forms submitted --
@@ -140,6 +142,36 @@ app.post('/slack/commands', async(req,res) => {
   appHome.commandOperate( req.body.user_id , req.body.text , req.body.channel_id , req.body.response_url )
   res.send();
   
+});
+
+/*
+ * Endpoint to oauth
+ */
+app.get('/slack/oauth', async(req,res) => {
+
+  if (!req.query.code) { // access denied
+    console.log('Access denied');
+    return;
+  }
+  var data = {form: {
+    client_id: process.env.SLACK_CLIENT_ID,
+    client_secret: process.env.SLACK_CLIENT_SECRET,
+    code: req.query.code
+  }};
+  
+  console.log(data)
+  
+  request.post(apiUrl + '/oauth.access', data, function (error, response, body) {
+    if (!error && response.statusCode == 200) {
+      
+      // Get an auth token (and store the team_id / token)    
+      appHome.preserveToken(body)
+      
+      res.sendStatus(200);      
+      // Show a nicer web page or redirect to Slack, instead of just giving 200 in reality!
+      //res.redirect(__dirname + "/public/success.html");
+    }
+  })
 });
 
 

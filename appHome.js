@@ -16,13 +16,17 @@ const checkWeek = argdate => {
   return week;
 };
 
-const addWeekBlock = (year, week, count, str) => {
+const addWeekBlock = (year, week, count, max, str) => {
+  var cntstr = "";
+  if (count > max) cntstr = `\`${count}\``;
+  else cntstr = `${count}`;
+
   const weekOne = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `${year} / ${week} week     count(s) : ${count}`
+        text: `${year} / ${week} week     count(s) : ${cntstr}`
       }
     },
     {
@@ -52,7 +56,7 @@ const updateView = async user => {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: "*Welcome!* This is a home for a Snack counter app."
+        text: "*Welcome! this is Snack counter.*"
       },
       accessory: {
         type: "button",
@@ -78,46 +82,46 @@ const updateView = async user => {
     const rawData = db.getData(`/${user}/data/`);
     newData = rawData.slice().reverse(); // Reverse to make the latest first
     newData = newData.slice(0, 500); // Just display 20. BlockKit display has some limit.
-  } catch (error) {
-    //console.error(error);
-  }
 
-  if (newData) {
-    let flyerBlocks = [];
-    let year = 0;
-    let week0 = 0;
-    let str = "";
-    let count = 0;
+    if (newData) {
+      let flyerBlocks = [];
+      let year = 0;
+      let week0 = 0;
+      let str = "";
+      let count = 0;
+      let max = 10;
 
-    for (const o of newData) {
-      let flyer = o.flyer;
-      let day = new Date(o.timestamp);
-      let week1 = checkWeek(day);
+      for (const o of newData) {
+        let flyer = o.flyer;
+        let day = new Date(o.timestamp);
+        let week1 = checkWeek(day);
 
-      year = day.getFullYear();
-      if (week0 == 0) {
-        str = o.value;
+        year = day.getFullYear();
+        if (week0 == 0) {
+          str = o.value;
+          week0 = week1;
+          count = 1;
+          continue;
+        }
+        if (week0 == week1) {
+          // 連結する
+          str = o.value.concat(str);
+          count = count + 1;
+          continue;
+        }
+
+        blocks = blocks.concat(addWeekBlock(year, week0, count, max, str));
+        str = "";
         week0 = week1;
-        count = 1;
-        continue;
+        count = 0;
       }
-      if (week0 == week1) {
-        // 連結する
-        str = o.value.concat(str);
-        count = count + 1;
-        continue;
-      }
-
-      blocks = blocks.concat(addWeekBlock(year, week0, count, str));
-      str = "";
-      week0 = week1;
-      count = 0;
+      blocks = blocks.concat(addWeekBlock(year, week0, count, max, str));
     }
-    blocks = blocks.concat(addWeekBlock(year, week0, count, str));
+  } catch (error) {
+    console.error(error);
   }
 
   // The final view -
-
   let view = {
     type: "home",
     title: {
@@ -133,13 +137,16 @@ const updateView = async user => {
 /* Display App Home */
 
 const displayHome = async (user, data) => {
+  const token = await db.getData(`/${user}/token`);
+
   if (data) {
     // Store in a local DB
     db.push(`/${user}/data[]`, data, true);
   }
 
   const args = {
-    token: process.env.SLACK_BOT_TOKEN,
+    //    token: process.env.SLACK_BOT_TOKEN,
+    token: token.bot_access_token,
     user_id: user,
     view: await updateView(user)
   };
@@ -152,7 +159,7 @@ const displayHome = async (user, data) => {
   try {
     if (result.data.error) {
       console.log("ERROR!!!!!");
-      console.log(result.data.error);
+      console.log(result.data);
     }
   } catch (e) {
     console.log("CATCH!!!!!");
@@ -162,7 +169,7 @@ const displayHome = async (user, data) => {
 
 /* Open a modal */
 
-const openModal = async trigger_id => {
+const openModal = async (trigger_id , user )=> {
   const modal = {
     type: "modal",
     title: {
@@ -233,9 +240,12 @@ const openModal = async trigger_id => {
       }
     ]
   };
+  
+  const token = await db.getData(`/${user}/token`);
 
   const args = {
-    token: process.env.SLACK_BOT_TOKEN,
+    // token: process.env.SLACK_BOT_TOKEN,
+    token: token.bot_access_token,
     trigger_id: trigger_id,
     view: JSON.stringify(modal)
   };
@@ -243,24 +253,24 @@ const openModal = async trigger_id => {
   const result = await axios.post(`${apiUrl}/views.open`, qs.stringify(args));
 };
 
-
-
-
-
 /* Command operate */
 const commandOperate = async (user, rawcmd, channel_id, response_url) => {
+
+  const token = await db.getData(`/${user}/token`);
+    
   const args = {
-    token: process.env.SLACK_BOT_TOKEN,
+  //  token: process.env.SLACK_BOT_TOKEN,
+    token: token.bot_access_token,
     user_id: user,
     channel: channel_id,
     text: "test message sended"
   };
-  
+
   var cmds = rawcmd.split(/\s/);
-    
+
   switch (cmds[0]) {
     case "reset":
-      db.delete(`/${user}/data/`)
+      db.delete(`/${user}/data/`);
       args.text = "reset all log";
       break;
     case "delete":
@@ -271,10 +281,10 @@ const commandOperate = async (user, rawcmd, channel_id, response_url) => {
       const rawData = db.getData(`/${user}/data/`);
       args.text = "all snacks info\n";
       for (const o of rawData) {
-        args.text = args.text.concat(`${o.timestamp} ${o.value}\n`)
+        args.text = args.text.concat(`${o.timestamp} ${o.value}\n`);
         let flyer = o.flyer;
-      }    
-      
+      }
+
       break;
   }
   const result = await axios.post(
@@ -283,4 +293,18 @@ const commandOperate = async (user, rawcmd, channel_id, response_url) => {
   );
 };
 
-module.exports = { displayHome, openModal, commandOperate };
+// infomation store
+const preserveToken = async body => {
+  const token = {
+    access_token: JSON.parse(body).access_token,
+    bot_access_token: JSON.parse(body).bot.bot_access_token,
+    user_id: JSON.parse(body).user_id,
+    team_id: JSON.parse(body).team_id
+  };
+
+  if (body) {
+    db.push(`/${token.user_id}/token`, token, true);
+  }
+};
+
+module.exports = { displayHome, openModal, commandOperate, preserveToken };
