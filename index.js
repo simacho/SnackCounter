@@ -80,8 +80,7 @@ app.post('/slack/events', async(req, res) => {
  */
 
 app.post('/slack/actions', async(req, res) => {
-  console.log(JSON.parse(req.body.payload));
-  
+  // console.log(JSON.parse(req.body.payload));
   const { token, trigger_id, user, actions, type } = JSON.parse(req.body.payload);
  
   // Button with "add_" action_id clicked --

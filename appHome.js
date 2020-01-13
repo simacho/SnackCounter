@@ -1,8 +1,14 @@
 const axios = require("axios");
 const qs = require("qs");
+const fs = require("fs");
 
 const JsonDB = require("node-json-db");
 const db = new JsonDB(".data/preserve", true, false);
+
+const dbqFile = "./.data/sqlite.db";
+const exists = fs.existsSync(dbqFile);
+const sqlite3 = require("sqlite3").verbose();
+const dbq = new sqlite3.Database(dbqFile);
 
 const apiUrl = "https://slack.com/api";
 const moment = require("moment");
@@ -48,6 +54,16 @@ const addWeekBlock = (year, week, count, max, str) => {
  * Home View - Use Block Kit Builder to compose: https://api.slack.com/tools/block-kit-builder
  */
 
+function dball(sql, params) {
+  return new Promise((resolve, reject) => {
+    dbq.all(sql, params, (err, row) => {
+      if (err) reject(err);
+      console.log(sql);
+      resolve(row);
+    });
+  });
+}
+
 const updateView = async user => {
   // Intro message -
 
@@ -75,16 +91,15 @@ const updateView = async user => {
   ];
 
   // Append new data blocks after the intro -
-
-  let newData = [];
-
   try {
-    const rawData = db.getData(`/${user}/data/`);
-    newData = rawData.slice().reverse(); // Reverse to make the latest first
-    newData = newData.slice(0, 500); // Just display 20. BlockKit display has some limit.
+    // const rawData = db.getData(`/${user}/data/`);
+    // newData = rawData.slice().reverse(); // Reverse to make the latest first
+    // newData = newData.slice(0, 500); // Just display 20. BlockKit display has some limit.
 
-    if (newData) {
-      let flyerBlocks = [];
+    var sql = `SELECT * FROM snacks WHERE uid = \"${user}\" ORDER BY time DESC`;
+    var newData = await dball(sql);
+
+    if (newData.length > 0) {
       let year = 0;
       let week0 = 0;
       let str = "";
@@ -92,20 +107,20 @@ const updateView = async user => {
       let max = 10;
 
       for (const o of newData) {
-        let flyer = o.flyer;
-        let day = new Date(o.timestamp);
+        // let flyer = o.flyer;
+        let day = new Date(o.time);
         let week1 = checkWeek(day);
 
         year = day.getFullYear();
         if (week0 == 0) {
-          str = o.value;
+          str = o.val;
           week0 = week1;
           count = 1;
           continue;
         }
         if (week0 == week1) {
           // 連結する
-          str = o.value.concat(str);
+          str = o.val.concat(str);
           count = count + 1;
           continue;
         }
@@ -117,40 +132,50 @@ const updateView = async user => {
       }
       blocks = blocks.concat(addWeekBlock(year, week0, count, max, str));
     }
+
+    // The final view -
+    let view = {
+      type: "home",
+      title: {
+        type: "plain_text",
+        text: "Keep notes!"
+      },
+      blocks: blocks
+    };
+
+    return JSON.stringify(view);
   } catch (error) {
     console.error(error);
   }
-
-  // The final view -
-  let view = {
-    type: "home",
-    title: {
-      type: "plain_text",
-      text: "Keep notes!"
-    },
-    blocks: blocks
-  };
-
-  return JSON.stringify(view);
 };
 
 /* Display App Home */
 
 const displayHome = async (user, data) => {
   const token = await db.getData(`/${user}/token`);
+  var qtoken = "";
+  var rows = [];
+
+  rows = await dball(`SELECT token FROM users WHERE uid = \'${user}\'`);
+  qtoken = rows[0].token;
 
   if (data) {
     // Store in a local DB
     db.push(`/${user}/data[]`, data, true);
+    db.push(`/${user}/previous_data`, data.value, true);
+
+    var sql = `INSERT INTO snacks(uid,time,val) VALUES(\"${user}\",\"${data.timestamp}\",\"${data.value}\")`;
+    await dball(sql);
   }
 
   const args = {
     //    token: process.env.SLACK_BOT_TOKEN,
-    token: token.bot_access_token,
+    // token: token.bot_access_token,
+    token: qtoken,
     user_id: user,
     view: await updateView(user)
   };
-
+  
   const result = await axios.post(
     `${apiUrl}/views.publish`,
     qs.stringify(args)
@@ -169,7 +194,7 @@ const displayHome = async (user, data) => {
 
 /* Open a modal */
 
-const openModal = async (trigger_id , user )=> {
+const openModal = async (trigger_id, user) => {
   const modal = {
     type: "modal",
     title: {
@@ -240,7 +265,7 @@ const openModal = async (trigger_id , user )=> {
       }
     ]
   };
-  
+
   const token = await db.getData(`/${user}/token`);
 
   const args = {
@@ -255,11 +280,10 @@ const openModal = async (trigger_id , user )=> {
 
 /* Command operate */
 const commandOperate = async (user, rawcmd, channel_id, response_url) => {
-
   const token = await db.getData(`/${user}/token`);
-    
+
   const args = {
-  //  token: process.env.SLACK_BOT_TOKEN,
+    //  token: process.env.SLACK_BOT_TOKEN,
     token: token.bot_access_token,
     user_id: user,
     channel: channel_id,
@@ -304,6 +328,11 @@ const preserveToken = async body => {
 
   if (body) {
     db.push(`/${token.user_id}/token`, token, true);
+
+    dbq.serialize(() => {
+      var sql = `REPLACE INTO users(uid,token) VALUES(\"${token.user_id}\",\"${token.bot_access_token}\")`;
+      dbq.run(sql);
+    });
   }
 };
 
