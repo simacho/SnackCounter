@@ -3,7 +3,6 @@ dependencies:
   body-parser: 1.19.0
   express: 4.17.1
   moment: 2.24.0
-  node-json-db: 0.11.0
   qs: 6.9.1
   request: 2.88.0
   sqlite3: 4.1.1
@@ -682,12 +681,6 @@ packages:
       node: '>= 0.6'
     resolution:
       integrity: sha512-hZXc7K2e+PgeI1eDBe/10Ard4ekbfrrqG8Ep+8Jmf4JID2bNg7NvCPOZN+kfF574pFQI7mum2AUqDidoKqcTOw==
-  /node-json-db/0.11.0:
-    dependencies:
-      mkdirp: 0.5.1
-    dev: false
-    resolution:
-      integrity: sha512-QsP8/qJmVPhC2qnxO3O4NIsAd/FDVnO/eNtQvATkWjhPZe7sKeANGcELHk2vnJt6qXHmvolLP1ylaFjSvp9hcw==
   /node-pre-gyp/0.11.0:
     dependencies:
       detect-libc: 1.0.3
@@ -1187,7 +1180,6 @@ specifiers:
   body-parser: ^1.19.0
   express: ^4.16.4
   moment: ^2.24.0
-  node-json-db: ^0.11.0
   qs: ^6.9.0
   request: ^2.88.0
   sqlite3: ^4.0.0

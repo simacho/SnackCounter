@@ -2,9 +2,6 @@ const axios = require("axios");
 const qs = require("qs");
 const fs = require("fs");
 
-const JsonDB = require("node-json-db");
-const db = new JsonDB(".data/preserve", true, false);
-
 const dbqFile = "./.data/sqlite.db";
 const exists = fs.existsSync(dbqFile);
 const sqlite3 = require("sqlite3").verbose();
@@ -90,12 +87,8 @@ const updateView = async user => {
     }
   ];
 
-  // Append new data blocks after the intro -
+  // select snacks log
   try {
-    // const rawData = db.getData(`/${user}/data/`);
-    // newData = rawData.slice().reverse(); // Reverse to make the latest first
-    // newData = newData.slice(0, 500); // Just display 20. BlockKit display has some limit.
-
     var sql = `SELECT * FROM snacks WHERE uid = \"${user}\" ORDER BY time DESC`;
     var newData = await dball(sql);
 
@@ -152,25 +145,20 @@ const updateView = async user => {
 /* Display App Home */
 
 const displayHome = async (user, data) => {
-  const token = await db.getData(`/${user}/token`);
   var qtoken = "";
   var rows = [];
 
+  // get token
   rows = await dball(`SELECT token FROM users WHERE uid = \'${user}\'`);
   qtoken = rows[0].token;
 
   if (data) {
-    // Store in a local DB
-    db.push(`/${user}/data[]`, data, true);
-    db.push(`/${user}/previous_data`, data.value, true);
-
+    // store a new log
     var sql = `INSERT INTO snacks(uid,time,val) VALUES(\"${user}\",\"${data.timestamp}\",\"${data.value}\")`;
     await dball(sql);
   }
 
   const args = {
-    //    token: process.env.SLACK_BOT_TOKEN,
-    // token: token.bot_access_token,
     token: qtoken,
     user_id: user,
     view: await updateView(user)
@@ -183,17 +171,14 @@ const displayHome = async (user, data) => {
 
   try {
     if (result.data.error) {
-      console.log("ERROR!!!!!");
-      console.log(result.data);
+      console.log("ERROR!" , result.data);
     }
   } catch (e) {
-    console.log("CATCH!!!!!");
-    console.log(e);
+    console.log("CATCH!",e);
   }
 };
 
-/* Open a modal */
-
+// open modal
 const openModal = async (trigger_id, user) => {
   const modal = {
     type: "modal",
@@ -266,11 +251,12 @@ const openModal = async (trigger_id, user) => {
     ]
   };
 
-  const token = await db.getData(`/${user}/token`);
-
+  // get token
+  var rows = await dball(`SELECT token FROM users WHERE uid = \'${user}\'`);
+  var qtoken = rows[0].token;
+    
   const args = {
-    // token: process.env.SLACK_BOT_TOKEN,
-    token: token.bot_access_token,
+    token: qtoken,
     trigger_id: trigger_id,
     view: JSON.stringify(modal)
   };
@@ -280,11 +266,13 @@ const openModal = async (trigger_id, user) => {
 
 /* Command operate */
 const commandOperate = async (user, rawcmd, channel_id, response_url) => {
-  const token = await db.getData(`/${user}/token`);
-
+  // get token
+  var rows = await dball(`SELECT token FROM users WHERE uid = \'${user}\'`);
+  var qtoken = rows[0].token;
+  var sql = ""
+  
   const args = {
-    //  token: process.env.SLACK_BOT_TOKEN,
-    token: token.bot_access_token,
+    token: qtoken,
     user_id: user,
     channel: channel_id,
     text: "test message sended"
@@ -294,21 +282,22 @@ const commandOperate = async (user, rawcmd, channel_id, response_url) => {
 
   switch (cmds[0]) {
     case "reset":
-      db.delete(`/${user}/data/`);
+      sql = `DELETE FROM snacks WHERE uid = \'${user}\'`
+      await dball(sql)
       args.text = "reset all log";
       break;
     case "delete":
-      db.delete(`/${user}/data[-1]`);
-      args.text = "delete last count";
+      sql = `DELETE FROM snacks WHERE uid = \'${user}\' AND rowid = \'${cmds[1]}\'`
+      await dball(sql)
+      args.text = `delete id: ${cmds[1]}`;
       break;
     case "log":
-      const rawData = db.getData(`/${user}/data/`);
+      sql = `SELECT *,rowid FROM snacks WHERE uid = \'${user}\'`
+      const rawData = await dball(sql)
       args.text = "all snacks info\n";
       for (const o of rawData) {
-        args.text = args.text.concat(`${o.timestamp} ${o.value}\n`);
-        let flyer = o.flyer;
+        args.text = args.text.concat(`${o.rowid} : ${o.time} ${o.val}\n`);
       }
-
       break;
   }
   const result = await axios.post(
@@ -327,8 +316,6 @@ const preserveToken = async body => {
   };
 
   if (body) {
-    db.push(`/${token.user_id}/token`, token, true);
-
     dbq.serialize(() => {
       var sql = `REPLACE INTO users(uid,token) VALUES(\"${token.user_id}\",\"${token.bot_access_token}\")`;
       dbq.run(sql);

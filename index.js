@@ -94,12 +94,19 @@ app.post('/slack/actions', async(req, res) => {
     res.send(''); // Make sure to respond to the server to avoid an error
     
     const ts = new Date();
+    console.log(ts)
+    console.log(ts.getHours() , ts.getUTCHours())
+    
+    
     const { user, view } = JSON.parse(req.body.payload);
         
     const data = {
       timestamp: ts.toLocaleString(),
       value: view.state.values.flyer.snack.selected_option.value
     }
+    
+    console.log(data.timestamp)
+    
     
     appHome.displayHome(user.id, data);
   }
@@ -139,10 +146,9 @@ app.get('/slack/oauth', async(req,res) => {
       
       // Get an auth token (and store the team_id / token)    
       appHome.preserveToken(body)
+
       
-      res.sendStatus(200);      
-      // Show a nicer web page or redirect to Slack, instead of just giving 200 in reality!
-      //res.redirect(__dirname + "/public/success.html");
+      res.sendFile(__dirname + '/public/success.html');
     }
   })
 });
