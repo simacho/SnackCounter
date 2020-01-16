@@ -5,13 +5,13 @@
  */
 
 const express = require('express');
+const request = require('request');
 const bodyParser = require('body-parser');
 const axios = require('axios'); 
 const qs = require('qs');
 
 const signature = require('./verifySignature');
 const appHome = require('./appHome');
-const message = require('./message');
 
 const app = express();
 
@@ -34,6 +34,7 @@ const rawBodyBuffer = (req, res, buf, encoding) => {
 app.use(bodyParser.urlencoded({verify: rawBodyBuffer, extended: true }));
 app.use(bodyParser.json({ verify: rawBodyBuffer }));
 
+app.use(express.static(__dirname + '/public'));
 
 /*
  * Endpoint to receive events from Events API.
@@ -65,29 +66,6 @@ app.post('/slack/events', async(req, res) => {
           // Display App Home
           appHome.displayHome(user);
         }
-        
-        /* 
-         * If you want to allow user to create a note from DM, uncomment the part! 
-
-        // Triggered when the bot gets a DM
-        else if(type === 'message') {
-          
-          if(subtype !== 'bot_message') { 
-            
-            // Create a note from the text with a default color
-            const timestamp = new Date();
-            const data = {
-              timestamp: timestamp,
-              note: text,
-              color: 'yellow'
-            }
-            await appHome.displayHome(user, data);
-                                         
-            // DM back to the user 
-            message.send(channel, text);
-          }
-        }
-        */
       }
       break;
     }
@@ -102,14 +80,13 @@ app.post('/slack/events', async(req, res) => {
  */
 
 app.post('/slack/actions', async(req, res) => {
-  console.log(JSON.parse(req.body.payload));
-  
+  // console.log(JSON.parse(req.body.payload));
   const { token, trigger_id, user, actions, type } = JSON.parse(req.body.payload);
  
   // Button with "add_" action_id clicked --
   if(actions && actions[0].action_id.match(/add_/)) {
     // Open a modal window with forms to be submitted by a user
-    appHome.openModal(trigger_id);
+    appHome.openModal(trigger_id,user.id);
   } 
   
   // Modal forms submitted --
@@ -117,14 +94,19 @@ app.post('/slack/actions', async(req, res) => {
     res.send(''); // Make sure to respond to the server to avoid an error
     
     const ts = new Date();
+    console.log(ts)
+    console.log(ts.getHours() , ts.getUTCHours())
+    
+    
     const { user, view } = JSON.parse(req.body.payload);
-    
-   // console.log("---------------",view.state.values.flyer.snack.selected_option )   
-    
+        
     const data = {
       timestamp: ts.toLocaleString(),
       value: view.state.values.flyer.snack.selected_option.value
     }
+    
+    console.log(data.timestamp)
+    
     
     appHome.displayHome(user.id, data);
   }
@@ -140,6 +122,35 @@ app.post('/slack/commands', async(req,res) => {
   appHome.commandOperate( req.body.user_id , req.body.text , req.body.channel_id , req.body.response_url )
   res.send();
   
+});
+
+/*
+ * Endpoint to oauth
+ */
+app.get('/slack/oauth', async(req,res) => {
+
+  if (!req.query.code) { // access denied
+    console.log('Access denied');
+    return;
+  }
+  var data = {form: {
+    client_id: process.env.SLACK_CLIENT_ID,
+    client_secret: process.env.SLACK_CLIENT_SECRET,
+    code: req.query.code
+  }};
+  
+  console.log(data)
+  
+  request.post(apiUrl + '/oauth.access', data, function (error, response, body) {
+    if (!error && response.statusCode == 200) {
+      
+      // Get an auth token (and store the team_id / token)    
+      appHome.preserveToken(body)
+
+      
+      res.sendFile(__dirname + '/public/success.html');
+    }
+  })
 });
 
 

@@ -12,6 +12,8 @@ You click "Snack" button when you snack.
 App shows counts of snacking by week.
 
 ### Usage (Slash command)
+At your workspace home , You can only count up.
+Slash command provide below functions.
 
 - /snackcounter delete
 
