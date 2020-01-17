@@ -148,7 +148,7 @@ app.get('/slack/oauth', async(req,res) => {
       appHome.preserveToken(body)
 
       
-      res.sendFile(__dirname + '/public/success.html');
+      res.sendFile(__dirname + '/docs/success.html');
     }
   })
 });
