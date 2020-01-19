@@ -14,15 +14,20 @@ App shows counts of snacking by week.
 ​
 
 #### STEP 1
+
 You click "Snack" button when you snack.
+
 ![homeview](https://simacho.github.io/SnackCounter/inst00.jpg)
 
 #### STEP 2
+
 Choose kind of snacks you ate.
+
 ![homeview](https://simacho.github.io/SnackCounter/inst01.jpg)
 
 
 ### Usage (Slash command)
+
 At your workspace home , You can only count up.
 Slash command provide below some functions.
 ​
