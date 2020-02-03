@@ -41,6 +41,7 @@ app.use(express.static(__dirname + '/public'));
  */
 
 app.post('/slack/events', async(req, res) => {
+  
   switch (req.body.type) {
       
     case 'url_verification': {
@@ -66,7 +67,9 @@ app.post('/slack/events', async(req, res) => {
           // Display App Home
           appHome.displayHome(user);
         }
+                
       }
+      
       break;
     }
     default: { res.sendStatus(404); }

@@ -118,6 +118,8 @@ const updateView = async user => {
           continue;
         }
 
+        if ( str === "" ){ str = " "} // dummy
+        
         blocks = blocks.concat(addWeekBlock(year, week0, count, max, str));
         str = "";
         week0 = week1;
@@ -171,7 +173,7 @@ const displayHome = async (user, data) => {
 
   try {
     if (result.data.error) {
-      console.log("ERROR!" , result.data);
+      console.log("ERROR!" , result.data );
     }
   } catch (e) {
     console.log("CATCH!",e);
@@ -275,7 +277,7 @@ const commandOperate = async (user, rawcmd, channel_id, response_url) => {
     token: qtoken,
     user_id: user,
     channel: channel_id,
-    text: "test message sended"
+    text: "*This is Snack Counter.*\nThe following commands are available:\n\n/snackcounter log   : show your logs\n/snackcounter reset   : reset your all logs\n/snackcounter delete ID   : delete ID record\n"
   };
 
   var cmds = rawcmd.split(/\s/);
