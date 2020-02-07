@@ -13,9 +13,9 @@ _Last updated: January, 2020_
 This app count of snacking by week.  
 このアプリは週毎のお菓子を食べた回数を数えるアプリです
 
-<!--
+<div>
 <a href="https://slack.com/oauth/authorize?scope=incoming-webhook,commands&client_id=647780859171.854718564373"><img alt=""Add to Slack"" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>
--->
+</div>
 
 ​
 
