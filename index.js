@@ -36,14 +36,15 @@ app.use(bodyParser.json({ verify: rawBodyBuffer }));
 
 app.use(express.static(__dirname + '/public'));
 
+
+
+
 /*
  * Endpoint to receive events from Events API.
  */
-
 app.post('/slack/events', async(req, res) => {
-  
-  switch (req.body.type) {
-      
+    
+  switch (req.body.type) {  
     case 'url_verification': {
       // verify Events API endpoint by returning challenge if present
       res.send({ challenge: req.body.challenge });
@@ -59,15 +60,24 @@ app.post('/slack/events', async(req, res) => {
       
       // Request is verified --
       else {
-        
         const {type, user, channel, tab, text, subtype} = req.body.event;
-
+        
         // Triggered when the App Home is opened by a user
-        if(type === 'app_home_opened') {
+        if(type === 'app_home_opened') { 
           // Display App Home
-          appHome.displayHome(user);
+          appHome.displayHome(user,req.body.team_id,req.body.token)
+          res.send()
         }
-                
+  
+        if(type === 'message'){
+          // response message.       
+          // console.log(req.body)  
+          // ユーザーのメッセージの場合は返答
+          if (req.body.event.client_msg_id){
+            appHome.respondHomeMessage( user , req.body.team_id , req.body.event.text , req.body.event.channel )          
+          }
+          res.sendStatus(200)
+        }        
       }
       
       break;
@@ -83,13 +93,13 @@ app.post('/slack/events', async(req, res) => {
  */
 
 app.post('/slack/actions', async(req, res) => {
-  // console.log(JSON.parse(req.body.payload));
-  const { token, trigger_id, user, actions, type } = JSON.parse(req.body.payload);
- 
+  console.log(JSON.parse(req.body.payload));
+  const { token, trigger_id, user, team , actions, type } = JSON.parse(req.body.payload);
+    
   // Button with "add_" action_id clicked --
   if(actions && actions[0].action_id.match(/add_/)) {
     // Open a modal window with forms to be submitted by a user
-    appHome.openModal(trigger_id,user.id);
+    appHome.openModal(trigger_id,user.id,team.id);
   } 
   
   // Modal forms submitted --
@@ -101,7 +111,7 @@ app.post('/slack/actions', async(req, res) => {
     console.log(ts.getHours() , ts.getUTCHours())
     
     
-    const { user, view } = JSON.parse(req.body.payload);
+    const { user, team , view } = JSON.parse(req.body.payload);
         
     const data = {
       timestamp: ts.toLocaleString(),
@@ -110,8 +120,7 @@ app.post('/slack/actions', async(req, res) => {
     
     console.log(data.timestamp)
     
-    
-    appHome.displayHome(user.id, data);
+    appHome.displayHome(user.id, team.id , token , data);
   }
 });
 
@@ -120,9 +129,9 @@ app.post('/slack/actions', async(req, res) => {
  */
 app.post('/slack/commands', async(req,res) => {
 
-  // console.log(req.body );  
+  console.log(req.body );  
   //  call slash command
-  appHome.commandOperate( req.body.user_id , req.body.text , req.body.channel_id , req.body.response_url )
+  appHome.commandOperate( req.body.user_id , req.body.team_id , req.body.text , req.body.channel_id , req.body.response_url )
   res.send();
   
 });
@@ -141,16 +150,13 @@ app.get('/slack/oauth', async(req,res) => {
     client_secret: process.env.SLACK_CLIENT_SECRET,
     code: req.query.code
   }};
-  
-  console.log(data)
-  
-  request.post(apiUrl + '/oauth.access', data, function (error, response, body) {
+    
+  request.post(apiUrl + '/oauth.v2.access', data, function (error, response, body) {
     if (!error && response.statusCode == 200) {
-      
+        
       // Get an auth token (and store the team_id / token)    
       appHome.preserveToken(body)
-
-      
+     
       res.sendFile(__dirname + '/docs/success.html');
     }
   })

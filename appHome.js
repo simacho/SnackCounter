@@ -61,7 +61,7 @@ function dball(sql, params) {
   });
 }
 
-const updateView = async user => {
+const updateView = async ( user , team ) => {
   // Intro message -
 
   let blocks = [
@@ -80,16 +80,12 @@ const updateView = async user => {
           emoji: true
         }
       }
-    },
-
-    {
-      type: "divider"
     }
   ];
 
   // select snacks log
   try {
-    var sql = `SELECT * FROM snacks WHERE uid = \"${user}\" ORDER BY rowid DESC`;
+    var sql = `SELECT * FROM snacks WHERE uid = \"${user}\" AND teamid = \"${team}\" ORDER BY rowid DESC`;
     var newData = await dball(sql);
 
     if (newData.length > 0) {
@@ -118,8 +114,10 @@ const updateView = async user => {
           continue;
         }
 
-        if ( str === "" ){ str = " "} // dummy
-        
+        if (str === "") {
+          str = " ";
+        } // dummy
+
         blocks = blocks.concat(addWeekBlock(year, week0, count, max, str));
         str = "";
         week0 = week1;
@@ -144,44 +142,103 @@ const updateView = async user => {
   }
 };
 
-/* Display App Home */
+const updateViewNonUser = async => {
+  // Intro message -
+  let blocks_nonuser = [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text:
+          "*Welcome! this is Snack counter.*\nClick here for install\nhttps://simacho.github.io/SnackCounter/instruction.html"
+      }
+    }
+  ];
 
-const displayHome = async (user, data) => {
+  // The final view -
+  let view = {
+    type: "home",
+    title: {
+      type: "plain_text",
+      text: "Welcome to Snack counter."
+    },
+    blocks: blocks_nonuser
+  };
+
+  return JSON.stringify(view);
+};
+
+/* Display App Home */
+const displayHome = async (user, team , token , data) => {
   var qtoken = "";
   var rows = [];
 
   // get token
-  rows = await dball(`SELECT token FROM users WHERE uid = \'${user}\'`);
-  qtoken = rows[0].token;
+  rows = await dball(`SELECT token FROM teams WHERE teamid = \'${team}\'`);
 
-  if (data) {
-    // store a new log
-    var sql = `INSERT INTO snacks(uid,time,val) VALUES(\"${user}\",\"${data.timestamp}\",\"${data.value}\")`;
-    await dball(sql);
-  }
+  if (rows.length > 0) {
+    qtoken = rows[0].token;
 
-  const args = {
-    token: qtoken,
-    user_id: user,
-    view: await updateView(user)
-  };
-  
-  const result = await axios.post(
-    `${apiUrl}/views.publish`,
-    qs.stringify(args)
-  );
-
-  try {
-    if (result.data.error) {
-      console.log("ERROR!" , result.data );
+    if (data) {
+      // store a new log
+      var sql = `INSERT INTO snacks(uid,teamid,time,val) VALUES(\"${user}\",\"${team}\",\"${data.timestamp}\",\"${data.value}\")`;
+      await dball(sql);
     }
-  } catch (e) {
-    console.log("CATCH!",e);
+
+    const args = {
+      token: qtoken,
+      user_id: user,
+      view: await updateView(user , team)
+    };
+
+    const result = await axios.post(
+      `${apiUrl}/views.publish`,
+      qs.stringify(args)
+    );
+
+    try {
+      if (result.data.error) {
+        console.log("ERROR!", result.data);
+      }
+    } catch (e) {
+      console.log("CATCH!", e);
+      }
   }
+  else {
+    
+    const args = {
+      token: token,
+      user_id: user,
+      view: await updateViewNonUser()
+    };
+    
+    console.log("Non User Info " , args)
+
+    /*
+    const result = await axios.post(
+      `${apiUrl}/views.publish`,
+      qs.stringify(args)
+    );
+    
+    console.log("Not authed user.")
+
+  　try {
+    　if (result.data.error) {
+      console.log("ERROR!", result.data);
+    　}
+    } catch (e) {
+      console.log("CATCH!", e);
+    }
+    */
+
+  
+  
+  }
+
 };
 
 // open modal
-const openModal = async (trigger_id, user) => {
+const openModal = async (trigger_id, user , team) => {
   const modal = {
     type: "modal",
     title: {
@@ -254,9 +311,9 @@ const openModal = async (trigger_id, user) => {
   };
 
   // get token
-  var rows = await dball(`SELECT token FROM users WHERE uid = \'${user}\'`);
+  var rows = await dball(`SELECT token FROM teams WHERE teamid = \'${team}\'`);
   var qtoken = rows[0].token;
-    
+
   const args = {
     token: qtoken,
     trigger_id: trigger_id,
@@ -266,63 +323,102 @@ const openModal = async (trigger_id, user) => {
   const result = await axios.post(`${apiUrl}/views.open`, qs.stringify(args));
 };
 
-/* Command operate */
-const commandOperate = async (user, rawcmd, channel_id, response_url) => {
-  // get token
-  var rows = await dball(`SELECT token FROM users WHERE uid = \'${user}\'`);
+/* Respond App Home Message */
+
+const respondHomeMessage = async (user, team , rawcmd, channel_id) => {
+  var rows = await dball(`SELECT token FROM teams WHERE teamid = \'${team}\'`);
   var qtoken = rows[0].token;
-  var sql = ""
-  
+  var sql = "";
+
   const args = {
     token: qtoken,
-    user_id: user,
     channel: channel_id,
-    text: "*This is Snack Counter.*\nThe following commands are available:\n\n/snackcounter log   : show your logs\n/snackcounter reset   : reset your all logs\n/snackcounter delete ID   : delete ID record\n"
+    text:
+      "Welcome to Snack Counter.\nThis apprication counts the number of times you ate.\nClick here for details.\nhttps://simacho.github.io/SnackCounter/instruction.html"
   };
 
-  var cmds = rawcmd.split(/\s/);
+  console.log(args);
 
-  switch (cmds[0]) {
-    case "reset":
-      sql = `DELETE FROM snacks WHERE uid = \'${user}\'`
-      await dball(sql)
-      args.text = "reset all log";
-      break;
-    case "delete":
-      sql = `DELETE FROM snacks WHERE uid = \'${user}\' AND rowid = \'${cmds[1]}\'`
-      await dball(sql)
-      args.text = `delete id: ${cmds[1]}`;
-      break;
-    case "log":
-      sql = `SELECT *,rowid FROM snacks WHERE uid = \'${user}\'`
-      const rawData = await dball(sql)
-      args.text = "all snacks info\n";
-      for (const o of rawData) {
-        args.text = args.text.concat(`${o.rowid} : ${o.time} ${o.val}\n`);
-      }
-      break;
-  }
   const result = await axios.post(
     `${apiUrl}/chat.postMessage`,
     qs.stringify(args)
   );
 };
 
+/* Command operate */
+const commandOperate = async (user, team, rawcmd, channel_id, response_url) => {
+  // get token
+  var rows = await dball(`SELECT token FROM teams WHERE teamid = \'${team}\'`);
+  var qtoken = rows[0].token;
+  var sql = "";
+
+  const args = {
+    token: qtoken,
+    // user_id: user,
+    // team_id: team,
+    channel: channel_id,
+    text:
+      "*This is Snack Counter.*\nThe following commands are available:\n\n/snackcounter log   : show your logs\n/snackcounter reset   : reset your all logs\n/snackcounter delete ID   : delete ID record\n"
+  };
+
+  var cmds = rawcmd.split(/\s/);
+
+  switch (cmds[0]) {
+    case "reset":
+      sql = `DELETE FROM snacks WHERE uid = \'${user}\' AND teamid = \'${team}\'`;
+      await dball(sql);
+      args.text = "reset all log";
+      break;
+    case "delete":
+      sql = `DELETE FROM snacks WHERE uid = \'${user}\' AND teamid = \'${team}\' AND rowid = \'${
+        cmds[1]
+      }\'`;
+      await dball(sql);
+      args.text = `delete id: ${cmds[1]}`;
+      break;
+    case "log":
+      sql = `SELECT *,rowid FROM snacks WHERE uid = \'${user}\' AND teamid = \'${team}\'`;
+      const rawData = await dball(sql);
+      args.text = "all snacks info\n";
+      for (const o of rawData) {
+        args.text = args.text.concat(`${o.rowid} : ${o.time} ${o.val}\n`);
+      }
+      break;
+  }
+  
+  const result = await axios.post(
+    `${apiUrl}/chat.postMessage`,
+    qs.stringify(args)
+  );
+
+  console.log("ARGS ", args)
+  console.log("RESULT ", result.data)
+
+
+};
+
 // infomation store
 const preserveToken = async body => {
   const token = {
     access_token: JSON.parse(body).access_token,
-    bot_access_token: JSON.parse(body).bot.bot_access_token,
     user_id: JSON.parse(body).user_id,
-    team_id: JSON.parse(body).team_id
+    team_id: JSON.parse(body).team.id
   };
 
+  console.log("BODY" , body)
+  
   if (body) {
     dbq.serialize(() => {
-      var sql = `REPLACE INTO users(uid,token) VALUES(\"${token.user_id}\",\"${token.bot_access_token}\")`;
+      var sql = `REPLACE INTO teams(teamid,token) VALUES(\"${token.team_id}\",\"${token.access_token}\")`;
       dbq.run(sql);
     });
   }
 };
 
-module.exports = { displayHome, openModal, commandOperate, preserveToken };
+module.exports = {
+  displayHome,
+  openModal,
+  commandOperate,
+  preserveToken,
+  respondHomeMessage
+};
