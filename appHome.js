@@ -89,7 +89,7 @@ const updateView = async user => {
 
   // select snacks log
   try {
-    var sql = `SELECT * FROM snacks WHERE uid = \"${user}\" ORDER BY time DESC`;
+    var sql = `SELECT * FROM snacks WHERE uid = \"${user}\" ORDER BY rowid DESC`;
     var newData = await dball(sql);
 
     if (newData.length > 0) {
