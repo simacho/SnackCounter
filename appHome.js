@@ -61,7 +61,7 @@ function dball(sql, params) {
   });
 }
 
-const updateView = async ( user , team ) => {
+const updateView = async ( user , team , channel ) => {
   // Intro message -
 
   let blocks = [
@@ -125,7 +125,19 @@ const updateView = async ( user , team ) => {
       }
       blocks = blocks.concat(addWeekBlock(year, week0, count, max, str));
     }
-
+    else {
+      // データがない場合は新規フローに変更
+      sql = `SELECT * FROM  users WHERE uid = \"${user}\" AND teamid = \"${team}\" ORDER BY rowid DESC`;
+      var userData = await dball(sql);
+      
+      if ( userData.length == 0){ 
+          var sql = `INSERT INTO users(uid,teamid) VALUES(\"${user}\",\"${team}\")`;
+          await dball(sql);     
+          respondHomeMessage(user,team,"",channel)
+      }
+    }
+    
+    
     // The final view -
     let view = {
       type: "home",
@@ -169,7 +181,7 @@ const updateViewNonUser = async => {
 };
 
 /* Display App Home */
-const displayHome = async (user, team , token , data) => {
+const displayHome = async (user, team , channel , token , data) => {
   var qtoken = "";
   var rows = [];
 
@@ -183,12 +195,15 @@ const displayHome = async (user, team , token , data) => {
       // store a new log
       var sql = `INSERT INTO snacks(uid,teamid,time,val) VALUES(\"${user}\",\"${team}\",\"${data.timestamp}\",\"${data.value}\")`;
       await dball(sql);
+
+      sql = `REPLACE INTO users(uid,teamid,latetext) VALUES(\"${user}\",\"${team}\",\"${data.value}\")`;
+      await dball(sql);
     }
 
     const args = {
       token: qtoken,
       user_id: user,
-      view: await updateView(user , team)
+      view: await updateView(user , team , channel )
     };
 
     const result = await axios.post(
@@ -211,28 +226,6 @@ const displayHome = async (user, team , token , data) => {
       user_id: user,
       view: await updateViewNonUser()
     };
-    
-    console.log("Non User Info " , args)
-
-    /*
-    const result = await axios.post(
-      `${apiUrl}/views.publish`,
-      qs.stringify(args)
-    );
-    
-    console.log("Not authed user.")
-
-  　try {
-    　if (result.data.error) {
-      console.log("ERROR!", result.data);
-    　}
-    } catch (e) {
-      console.log("CATCH!", e);
-    }
-    */
-
-  
-  
   }
 
 };
@@ -310,6 +303,16 @@ const openModal = async (trigger_id, user , team) => {
     ]
   };
 
+  // deepcopy
+  var cpmodal = JSON.parse(JSON.stringify(modal))
+  
+  // get latest value
+  var latetext = await dball(`SELECT latetext FROM users WHERE uid = \"${user}\" AND teamid = \"${team}\"`);
+  if (latetext.length > 0 && latetext[0].latetext){
+    cpmodal.blocks[0].element.initial_option.value = latetext[0].latetext
+    cpmodal.blocks[0].element.initial_option.text.text = latetext[0].latetext
+  }
+  
   // get token
   var rows = await dball(`SELECT token FROM teams WHERE teamid = \'${team}\'`);
   var qtoken = rows[0].token;
@@ -317,7 +320,7 @@ const openModal = async (trigger_id, user , team) => {
   const args = {
     token: qtoken,
     trigger_id: trigger_id,
-    view: JSON.stringify(modal)
+    view: JSON.stringify(cpmodal)
   };
 
   const result = await axios.post(`${apiUrl}/views.open`, qs.stringify(args));
@@ -334,10 +337,10 @@ const respondHomeMessage = async (user, team , rawcmd, channel_id) => {
     token: qtoken,
     channel: channel_id,
     text:
-      "Welcome to Snack Counter.\nThis apprication counts the number of times you ate.\nClick here for details.\nhttps://simacho.github.io/SnackCounter/instruction.html"
+      "Welcome to Snack Counter.\nThis apprication counts the number of times you ate.\n\n*How to use*\nStep 1: You click \`Snack!\` button when you snack.\nStep 2: Choose kind of snacks you ate.\nStep 3: Check your counts of snacks.\n\nClick here for details.\nhttps://simacho.github.io/SnackCounter/instruction.html"
   };
 
-  console.log(args);
+  // console.log(args);
 
   const result = await axios.post(
     `${apiUrl}/chat.postMessage`,
@@ -353,14 +356,15 @@ const commandOperate = async (user, team, rawcmd, channel_id, response_url) => {
   var sql = "";
 
   const args = {
-    token: qtoken,
+    // token: qtoken,
     // user_id: user,
     // team_id: team,
-    channel: channel_id,
+    // channel: channel_id,
+    response_type: "in_channel",
     text:
       "*This is Snack Counter.*\nThe following commands are available:\n\n/snackcounter log   : show your logs\n/snackcounter reset   : reset your all logs\n/snackcounter delete ID   : delete ID record\n"
   };
-
+  
   var cmds = rawcmd.split(/\s/);
 
   switch (cmds[0]) {
@@ -385,16 +389,13 @@ const commandOperate = async (user, team, rawcmd, channel_id, response_url) => {
       }
       break;
   }
-  
+      
   const result = await axios.post(
-    `${apiUrl}/chat.postMessage`,
-    qs.stringify(args)
-  );
-
-  console.log("ARGS ", args)
-  console.log("RESULT ", result.data)
-
-
+    `${response_url}`,
+    args
+  )
+  
+  return
 };
 
 // infomation store
@@ -405,7 +406,7 @@ const preserveToken = async body => {
     team_id: JSON.parse(body).team.id
   };
 
-  console.log("BODY" , body)
+  // console.log("BODY" , body)
   
   if (body) {
     dbq.serialize(() => {

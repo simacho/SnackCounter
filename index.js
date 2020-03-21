@@ -65,7 +65,7 @@ app.post('/slack/events', async(req, res) => {
         // Triggered when the App Home is opened by a user
         if(type === 'app_home_opened') { 
           // Display App Home
-          appHome.displayHome(user,req.body.team_id,req.body.token)
+          appHome.displayHome(user,req.body.team_id,channel,req.body.token)
           res.send()
         }
   
@@ -93,9 +93,14 @@ app.post('/slack/events', async(req, res) => {
  */
 
 app.post('/slack/actions', async(req, res) => {
-  console.log(JSON.parse(req.body.payload));
+  // console.log(JSON.parse(req.body.payload));
   const { token, trigger_id, user, team , actions, type } = JSON.parse(req.body.payload);
-    
+  
+  if (!signature.isVerified(req)) {
+    res.sendStatus(404);
+    return;
+  } 
+  
   // Button with "add_" action_id clicked --
   if(actions && actions[0].action_id.match(/add_/)) {
     // Open a modal window with forms to be submitted by a user
@@ -107,12 +112,13 @@ app.post('/slack/actions', async(req, res) => {
     res.send(''); // Make sure to respond to the server to avoid an error
     
     const ts = new Date();
-    console.log(ts)
-    console.log(ts.getHours() , ts.getUTCHours())
+    // console.log(ts)
+    // console.log(ts.getHours() , ts.getUTCHours())
     
     
     const { user, team , view } = JSON.parse(req.body.payload);
-        
+    const channel = ''    // dummy    
+    
     const data = {
       timestamp: ts.toLocaleString(),
       value: view.state.values.flyer.snack.selected_option.value
@@ -120,7 +126,7 @@ app.post('/slack/actions', async(req, res) => {
     
     console.log(data.timestamp)
     
-    appHome.displayHome(user.id, team.id , token , data);
+    appHome.displayHome(user.id, team.id , channel , token , data);
   }
 });
 
@@ -129,10 +135,15 @@ app.post('/slack/actions', async(req, res) => {
  */
 app.post('/slack/commands', async(req,res) => {
 
+  if (!signature.isVerified(req)) {
+    res.sendStatus(404);
+    return;
+  } 
+  
   console.log(req.body );  
   //  call slash command
   appHome.commandOperate( req.body.user_id , req.body.team_id , req.body.text , req.body.channel_id , req.body.response_url )
-  res.send();
+  res.send('');
   
 });
 
@@ -140,7 +151,7 @@ app.post('/slack/commands', async(req,res) => {
  * Endpoint to oauth
  */
 app.get('/slack/oauth', async(req,res) => {
-
+  
   if (!req.query.code) { // access denied
     console.log('Access denied');
     return;
