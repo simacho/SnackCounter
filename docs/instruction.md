@@ -18,7 +18,7 @@ This app count of snacking by week.
 ### Usage (Snack Counter Home)
 
 You click "Snack" button when you snack.
-App shows counts of snacking by week.  
+App shows counts of snacks by week.  
 食べたときに"Snack"ボタンを押してください。
 Home 画面に食べた回数が表示されます。
 ​
